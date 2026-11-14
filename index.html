@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализатор Авантюриста — ЕК: Золотой Век</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="glitch-bg" id="glitch-overlay"></div>
+
+    <div id="app">
+        <section id="screen-intro" class="screen active">
+            <h1 id="ui-title" class="glitch-text" data-text="Анализатор Авантюриста">Анализатор Авантюриста</h1>
+            <h2 id="ui-subtitle">ЕК: Золотой Век</h2>
+            <div class="terminal-window">
+                <p id="ui-intro" class="typewriter"></p>
+            </div>
+            <div class="btn-group">
+                <button class="neon-btn" onclick="startTest()">ДА</button>
+                <button class="neon-btn danger" onclick="rejectTest()">НЕТ</button>
+            </div>
+        </section>
+
+        <section id="screen-reject" class="screen">
+            <h2 class="glitch-text" data-text="До встречи.">До встречи.</h2>
+            <p class="terminal-window">Дверь остаётся открытой. Если передумаешь — Сдвиг подождёт.</p>
+            <button class="neon-btn" onclick="location.reload()">Я передумал</button>
+        </section>
+
+        <section id="screen-honesty" class="screen">
+            <h2 class="glitch-text" data-text="Отлично...">Отлично...</h2>
+            <p class="question-main">Обещаете ли вы отвечать честно?</p>
+            <div class="btn-group">
+                <button class="neon-btn" onclick="setHonesty(true)">ДА</button>
+                <button class="neon-btn danger" onclick="setHonesty(false)">НЕТ</button>
+            </div>
+            <p id="honesty-feedback" class="feedback error"></p>
+        </section>
+
+        <section id="screen-nick" class="screen">
+            <label for="nick-input" class="question-main">Как тебя зовут, авантюрист?</label>
+            <input type="text" id="nick-input" class="cyber-input" placeholder="Твой ник" maxlength="40" oninput="validateNick()">
+            <p class="note">Все ваши ответы анонимны и не сохраняются в кэше сайта</p>
+            <p id="nick-error" class="error"></p>
+            <button id="btn-continue-nick" class="neon-btn" onclick="startQuestions()" disabled>Продолжить</button>
+        </section>
+
+        <section id="screen-test" class="screen">
+            <div class="meters-container" id="meters-container"></div>
+            <div class="question-area">
+                <p id="progress-text" class="progress-label"></p>
+                <p id="question-text" class="typewriter-text"></p>
+                <div class="likert-container">
+                    <div class="likert-labels">
+                        <span>Полностью не согласен</span>
+                        <span>Совершенно согласен</span>
+                    </div>
+                    <div class="likert-scale" id="likert-scale"></div>
+                </div>
+                <div class="navigation-controls">
+                    <button id="btn-prev" class="neon-btn small" onclick="prevQuestion()" disabled>← Назад</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="screen-results" class="screen">
+            <h2 class="glitch-text" data-text="Результат отбора">Результат отбора</h2>
+            <div class="result-header">
+                <p id="result-name" class="cyber-name"></p>
+                <p id="result-coef" class="cyber-coef"></p>
+            </div>
+            <div id="result-stats" class="stats-grid"></div>
+            <p id="liar-jab" class="error mt-20"></p>
+            <div class="btn-group mt-20">
+                <button class="neon-btn" onclick="copyResults()">📋 Скопировать</button>
+                <button class="neon-btn" onclick="openRating()">📊 В рейтинге</button>
+                <button class="neon-btn" onclick="openDetails()">📖 Подробности</button>
+            </div>
+        </section>
+
+        <!-- НОВЫЙ ЭКРАН: Скрытая концовка -->
+        <section id="screen-secret" class="screen">
+            <div id="secret-text" style="text-align: center; font-size: 1.5rem; line-height: 2;"></div>
+        </section>
+
+        <div id="modal-rating" class="modal">
+            <div class="modal-content">
+                <h2 class="glitch-text" data-text="Рейтинг авантюристов">Рейтинг авантюристов</h2>
+                <p class="note">Нажми на имя, чтобы услышать комментарий.</p>
+                <div class="rating-tabs" id="rating-tabs"></div>
+                <div id="rating-list" class="rating-list"></div>
+                <button class="neon-btn mt-20" onclick="closeModal('modal-rating')">Закрыть</button>
+            </div>
+        </div>
+
+        <div id="modal-details" class="modal">
+            <div class="modal-content">
+                <h2 class="glitch-text" data-text="Подробности">Подробности</h2>
+                <div id="details-content" class="details-scroll"></div>
+                <button class="neon-btn mt-20" onclick="closeModal('modal-details')">Закрыть</button>
+            </div>
+        </div>
+
+        <footer id="ui-footer">Создано Егором Драгиным для ЕК. Копирайт 2019.</footer>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
