@@ -1,28 +1,31 @@
-// Глобальные переменные
 let playerScores = {}; 
 let currentQuestionIndex = 0;
 let shuffledQuestions = [];
 let playerNickname = "";
 let wasHonest = true;
-let answersHistory = []; // Теперь хранит объекты { value, question }
+let answersHistory = []; 
+let audioCtx = null;
 
-// --- Инициализация ---
 document.addEventListener("DOMContentLoaded", () => {
     renderMeters();
     renderRatingTabs();
     typeWriter(document.getElementById("ui-intro"), UI.ru.intro, 0);
 });
 
-// --- Логика баллов (Ужесточена) ---
-// Базовые баллы 2.0. Каждый ответ дает от -1.5 до +2.0.
-const SCORE_VALUES = { 
-    1: -1.5, // Категорически нет (сильный штраф)
-    2: -1.0, // Нет
-    3: -0.5, // Скорее нет (легкий штраф)
-    4: 0.5,  // Скорее да (небольшой плюс)
-    5: 1.0,  // Да
-    6: 2.0   // Абсолютно да
-};
+function playBeep(freq = 800, duration = 0.05) {
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+        osc.stop(audioCtx.currentTime + duration);
+    } catch(e) {}
+}
 
 function typeWriter(element, text, i, callback) {
     if (i === 0) element.innerHTML = "";
@@ -37,10 +40,11 @@ function showScreen(id) {
     document.getElementById(id).classList.add("active");
 }
 
-function startTest() { showScreen("screen-honesty"); }
-function rejectTest() { showScreen("screen-reject"); }
+function startTest() { playBeep(600); showScreen("screen-honesty"); }
+function rejectTest() { playBeep(300); showScreen("screen-reject"); }
 
 function setHonesty(isHonest) {
+    playBeep(600);
     wasHonest = isHonest;
     if (!isHonest) {
         document.getElementById("honesty-feedback").innerText = UI.ru.honestNo;
@@ -54,7 +58,6 @@ function validateNick() {
     const input = document.getElementById("nick-input").value.trim().toLowerCase();
     const errorEl = document.getElementById("nick-error");
     const btn = document.getElementById("btn-continue-nick");
-    
     let isReserved = false;
     for (let r of RESERVED) {
         if (r.names.some(n => input === n.toLowerCase() || input.includes(n.toLowerCase()))) {
@@ -84,14 +87,28 @@ function renderMeters() {
 }
 
 function updateMeters() {
+    let isDragging = false;
     PARAMS.forEach(p => {
         let val = playerScores[p.key] || 0;
         let percent = Math.min(100, Math.max(0, (val / 10) * 100));
-        document.getElementById(`bar-${p.key}`).style.width = `${percent}%`;
+        let bar = document.getElementById(`bar-${p.key}`);
+        bar.style.width = `${percent}%`;
+
+        if (val >= 10) {
+            bar.classList.add("shake");
+            isDragging = true;
+        } else {
+            bar.classList.remove("shake");
+        }
     });
+
+    const glitchOverlay = document.getElementById("glitch-overlay");
+    if (isDragging) glitchOverlay.classList.add("dragin-mode");
+    else glitchOverlay.classList.remove("dragin-mode");
 }
 
 function startQuestions() {
+    playBeep(800);
     playerNickname = document.getElementById("nick-input").value.trim();
     
     const firstQ = QUESTIONS.find(q => q.fixed);
@@ -101,12 +118,11 @@ function startQuestions() {
     shuffledQuestions = [firstQ, ...rest];
     currentQuestionIndex = 0;
     
-    // Стартуем с 2 баллов (чтобы не было нуля)
     playerScores = { D: 2, R: 2, A: 2, G: 2, I: 2, N: 2 }; 
     answersHistory = [];
     
     showScreen("screen-test");
-    updateMeters(); // Сброс шкал на старт
+    updateMeters();
     loadQuestion();
 }
 
@@ -124,7 +140,6 @@ function loadQuestion() {
 
     typeWriter(qText, q.text.ru, 0);
 
-    // Восстановление выбора, если возвращались назад
     let prevAnswer = answersHistory[currentQuestionIndex] ? answersHistory[currentQuestionIndex].value : null;
 
     for (let i = 1; i <= 6; i++) {
@@ -138,17 +153,17 @@ function loadQuestion() {
 }
 
 function answerQuestion(value, question) {
+    playBeep(400 + (value * 100));
+    
     document.querySelectorAll(".likert-option").forEach((el, idx) => {
         el.classList.remove("selected");
         if (idx + 1 === value) el.classList.add("selected");
     });
 
-    // Если игрок меняет ответ на этот же вопрос — откатываем старый
     if (answersHistory[currentQuestionIndex]) {
         rollbackScore(answersHistory[currentQuestionIndex].question, answersHistory[currentQuestionIndex].value);
     }
 
-    // Применяем новый
     applyScore(question, value);
     answersHistory[currentQuestionIndex] = { value: value, question: question };
     
@@ -161,29 +176,34 @@ function answerQuestion(value, question) {
         } else {
             finishTest();
         }
-    }, 400);
+    }, 300);
 }
 
 function prevQuestion() {
     if (currentQuestionIndex > 0) {
+        playBeep(300);
         currentQuestionIndex--;
-        // loadQuestion сам восстановит выбранный кружок из answersHistory
         loadQuestion();
     }
 }
 
-// --- Математика ---
+const SCORE_VALUES = { 1: -1.5, 2: -0.75, 3: 0, 4: 0.5, 5: 0.75, 6: 1.5 };
+
 function applyScore(question, value) {
     let multiplier = SCORE_VALUES[value];
     if (question.inverted) multiplier *= -1;
 
     for (let key in question.effects) {
-        let effect = question.effects[key] * multiplier;
-        
-        // Первый вопрос всегда дает фикс +0.5 всем (и не более)
-        if (question.fixed) effect = 0.5;
+        let actualEffect = question.effects[key] * (multiplier / 1.5);
+        if (question.fixed) actualEffect = 0.25;
 
-        playerScores[key] += effect;
+        if (question.caps && question.caps[key]) {
+            let capValue = question.caps[key];
+            if (actualEffect > capValue) actualEffect = capValue;
+            if (actualEffect < -capValue) actualEffect = -capValue;
+        }
+
+        playerScores[key] += actualEffect;
         clampScore(key);
     }
 }
@@ -193,10 +213,16 @@ function rollbackScore(question, value) {
     if (question.inverted) multiplier *= -1;
 
     for (let key in question.effects) {
-        let effect = question.effects[key] * multiplier;
-        if (question.fixed) effect = 0.5;
+        let actualEffect = question.effects[key] * (multiplier / 1.5);
+        if (question.fixed) actualEffect = 0.25;
+
+        if (question.caps && question.caps[key]) {
+            let capValue = question.caps[key];
+            if (actualEffect > capValue) actualEffect = capValue;
+            if (actualEffect < -capValue) actualEffect = -capValue;
+        }
         
-        playerScores[key] -= effect;
+        playerScores[key] -= actualEffect;
         clampScore(key);
     }
 }
@@ -219,8 +245,54 @@ function finishTest() {
     const resultData = { name: playerNickname, stats: finalStats, coef: coef, honest: wasHonest };
     localStorage.setItem("ek_adventurer_result", JSON.stringify(resultData));
 
-    displayResults(resultData);
-    showScreen("screen-results");
+    // Проверка на скрытую концовку (3+ параметра на 10)
+    let maxCount = 0;
+    for (let key in finalStats) {
+        if (finalStats[key] >= 10) maxCount++;
+    }
+
+    if (maxCount >= 3) {
+        showSecretEnding();
+    } else {
+        displayResults(resultData);
+        showScreen("screen-results");
+        playBeep(1200, 0.2);
+    }
+}
+
+function showSecretEnding() {
+    showScreen("screen-secret");
+    const textEl = document.getElementById("secret-text");
+    textEl.innerHTML = "";
+    
+    const lines = [
+        "Так ты уже был здесь и обо всем знаешь?",
+        "Интересно. Очень интересно.",
+        "Возможно, ты — не просто авантюрист.",
+        "Возможно, ты — тот, кого мы искали.",
+        "Добро пожаловать в Плеяду. По-настоящему."
+    ];
+    
+    let i = 0;
+    function typeNext() {
+        if (i < lines.length) {
+            let p = document.createElement("p");
+            p.innerHTML = "";
+            textEl.appendChild(p);
+            typeWriter(p, lines[i], 0, () => {
+                i++;
+                setTimeout(typeNext, 800);
+            });
+        } else {
+            let btn = document.createElement("button");
+            btn.className = "neon-btn";
+            btn.innerText = "Вернуться";
+            btn.style.marginTop = "40px";
+            btn.onclick = () => location.reload();
+            textEl.appendChild(btn);
+        }
+    }
+    typeNext();
 }
 
 function displayResults(data) {
@@ -261,10 +333,10 @@ function copyResults() {
 
     navigator.clipboard.writeText(text).then(() => {
         alert("Результаты скопированы!");
+        playBeep(1000);
     }).catch(() => alert("Не удалось скопировать."));
 }
 
-// --- РЕЙТИНГ (С коэффициентом и позицией игрока) ---
 function renderRatingTabs() {
     const tabs = document.getElementById("rating-tabs");
     tabs.innerHTML = "";
@@ -288,11 +360,15 @@ function setActiveTab(activeBtn) {
 }
 
 function openRating() {
+    playBeep(500);
     document.getElementById("modal-rating").classList.add("open");
     sortRating(null);
 }
 
-function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+function closeModal(id) { 
+    playBeep(300);
+    document.getElementById(id).classList.remove("open"); 
+}
 
 function sortRating(paramKey) {
     const container = document.getElementById("rating-list");
@@ -311,7 +387,7 @@ function sortRating(paramKey) {
             name: playerData.name,
             stats: playerData.stats,
             coef: playerData.coef,
-            desc: { ru: "Это ты." },
+            desc: "Это ты. Твоя судьба еще не написана.",
             isPlayer: true
         });
     }
@@ -325,20 +401,35 @@ function sortRating(paramKey) {
     list.forEach((char, index) => {
         let div = document.createElement("div");
         div.className = "rating-row" + (char.isPlayer ? " you" : "");
+        div.style.animationDelay = `${index * 0.05}s`;
         
         let statsStr = paramKey 
             ? `${paramKey}: ${char.stats[paramKey]}` 
             : `D:${char.stats.D} R:${char.stats.R} A:${char.stats.A} G:${char.stats.G} I:${char.stats.I} N:${char.stats.N}`;
 
-        let nameStr = char.isPlayer ? `${char.name} <span style="font-size:0.8em">(ТЫ)</span>` : char.name;
-        
-        // Выводим и статы, и коэффициент
-        div.innerHTML = `<span><span class="pos">#${index + 1}</span> ${nameStr}</span> <span>${statsStr} <span style="color:#555; margin-left:10px;">| Коэфф: ${char.coef}</span></span>`;
+        let nameHtml = char.isPlayer 
+            ? `${char.name} <span style="font-size:0.8em">(ТЫ)</span>` 
+            : `<span class="name-clickable" onclick="toggleComment(${index})">${char.name}</span>`;
+
+        div.innerHTML = `
+            <div>
+                <span class="pos">#${index + 1}</span> ${nameHtml}
+                <div class="char-comment" id="comment-${index}">"${char.desc}"</div>
+            </div>
+            <span>${statsStr} <span style="color:#555; margin-left:10px;">| Коэфф: ${char.coef}</span></span>
+        `;
         container.appendChild(div);
     });
 }
 
+function toggleComment(index) {
+    playBeep(700);
+    const comment = document.getElementById(`comment-${index}`);
+    if (comment) comment.classList.toggle("show");
+}
+
 function openDetails() {
+    playBeep(500);
     document.getElementById("modal-details").classList.add("open");
     const container = document.getElementById("details-content");
     let playerData = JSON.parse(localStorage.getItem("ek_adventurer_result"));
