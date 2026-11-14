@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="scanlines"></div>
-    <div class="glitch-bg"></div>
+    <div class="glitch-bg" id="glitch-overlay"></div>
 
     <div id="app">
         <section id="screen-intro" class="screen active">
@@ -48,27 +48,17 @@
         </section>
 
         <section id="screen-test" class="screen">
-            <!-- Эффект ряби на весь экран -->
-            <div class="test-glitch-overlay"></div>
-
-            <div class="meters-container">
-                <!-- Шкалы генерируются в JS -->
-            </div>
-
+            <div class="meters-container" id="meters-container"></div>
             <div class="question-area">
                 <p id="progress-text" class="progress-label"></p>
                 <p id="question-text" class="typewriter-text"></p>
-                
                 <div class="likert-container">
                     <div class="likert-labels">
                         <span>Полностью не согласен</span>
                         <span>Совершенно согласен</span>
                     </div>
-                    <div class="likert-scale" id="likert-scale">
-                        <!-- Кружочки 1-6 -->
-                    </div>
+                    <div class="likert-scale" id="likert-scale"></div>
                 </div>
-                
                 <div class="navigation-controls">
                     <button id="btn-prev" class="neon-btn small" onclick="prevQuestion()" disabled>← Назад</button>
                 </div>
@@ -90,18 +80,21 @@
             </div>
         </section>
 
-        <!-- МОДАЛКА: Рейтинг -->
+        <!-- НОВЫЙ ЭКРАН: Скрытая концовка -->
+        <section id="screen-secret" class="screen">
+            <div id="secret-text" style="text-align: center; font-size: 1.5rem; line-height: 2;"></div>
+        </section>
+
         <div id="modal-rating" class="modal">
             <div class="modal-content">
                 <h2 class="glitch-text" data-text="Рейтинг авантюристов">Рейтинг авантюристов</h2>
-                <p class="note">Выберите параметр для сортировки:</p>
+                <p class="note">Нажми на имя, чтобы услышать комментарий.</p>
                 <div class="rating-tabs" id="rating-tabs"></div>
                 <div id="rating-list" class="rating-list"></div>
                 <button class="neon-btn mt-20" onclick="closeModal('modal-rating')">Закрыть</button>
             </div>
         </div>
 
-        <!-- МОДАЛКА: Подробности -->
         <div id="modal-details" class="modal">
             <div class="modal-content">
                 <h2 class="glitch-text" data-text="Подробности">Подробности</h2>
